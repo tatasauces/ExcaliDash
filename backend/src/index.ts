@@ -11,6 +11,7 @@ import multer from "multer";
 import archiver from "archiver";
 import { z } from "zod";
 import { PrismaClient, Prisma } from "./generated/client";
+import { PrismaLibSQL } from '@prisma/adapter-libsql';
 import {
   sanitizeDrawingData,
   validateImportedDrawing,
@@ -143,7 +144,12 @@ const io = new Server(httpServer, {
   },
   maxHttpBufferSize: 1e8,
 });
-const prisma = new PrismaClient();
+const adapter = new PrismaLibSQL({
+  url: process.env.TURSO_DATABASE_URL,
+  authToken: process.env.TURSO_AUTH_TOKEN,
+});
+const prisma = new PrismaClient({ adapter });
+
 const parseJsonField = <T>(
   rawValue: string | null | undefined,
   fallback: T
