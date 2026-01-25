@@ -14,8 +14,8 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "@prisma/adapter-libsql": "5.4.2",
-    "@prisma/client": "5.4.2",
+    "@prisma/adapter-libsql": "5.5.1",
+    "@prisma/client": "5.5.1",
     "@types/archiver": "^7.0.0",
     "@types/jsdom": "^21.1.7",
     "@types/multer": "^2.0.0",
@@ -28,7 +28,7 @@
     "express": "^5.1.0",
     "jsdom": "^22.1.0",
     "multer": "^2.0.2",
-    "prisma": "5.4.2",
+    "prisma": "5.5.1",
     "socket.io": "^4.8.1",
     "zod": "^4.1.12"
   },
