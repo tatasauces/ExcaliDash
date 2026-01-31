@@ -66,8 +66,9 @@ const resolveDatabaseUrl = (rawUrl?: string) => {
   return `file:${absolutePath}`;
 };
 
-process.env.DATABASE_URL = resolveDatabaseUrl(process.env.DATABASE_URL);
-console.log("Resolved DATABASE_URL:", process.env.DATABASE_URL);
+const resolvedDatabaseUrl = resolveDatabaseUrl(process.env.DATABASE_URL);
+process.env.DATABASE_URL = resolvedDatabaseUrl;
+console.log("Resolved DATABASE_URL for Prisma validation:", resolvedDatabaseUrl);
 
 // Helper to get the resolved database file path
 const getResolvedDbPath = (): string => {
@@ -163,7 +164,7 @@ const prisma = new PrismaClient({
   adapter,
   datasources: {
     db: {
-      url: process.env.DATABASE_URL,
+      url: resolvedDatabaseUrl,
     },
   },
 });
@@ -1301,12 +1302,31 @@ const ensureTrashCollection = async () => {
       console.log("Created Trash collection");
     }
   } catch (error) {
-    console.error("Failed to ensure Trash collection:", error);
+    const err = error as any;
+    if (err.code === "P2021" || (err.message && err.message.includes("no such table"))) {
+      console.error("\n[DATABASE ERROR] Tables are missing in your Turso database.");
+      console.error("Please run the following command from your LOCAL terminal to initialize the database:");
+      console.error("\n  cd backend && npx prisma db push\n");
+      console.error("Make sure your local .env has TURSO_DATABASE_URL and TURSO_AUTH_TOKEN set.\n");
+    } else {
+      console.error("Failed to ensure Trash collection:", error);
+    }
+  }
+};
+
+const checkDatabaseConnection = async () => {
+  try {
+    // Simple query to verify connection
+    await prisma.$queryRaw`SELECT 1`;
+    console.log("Database connection successful.");
+  } catch (error) {
+    console.error("[DATABASE ERROR] Could not connect to Turso:", error);
   }
 };
 
 httpServer.listen(PORT, async () => {
   await initializeUploadDir();
+  await checkDatabaseConnection();
   await ensureTrashCollection();
   console.log(`Server running on port ${PORT}`);
 });
