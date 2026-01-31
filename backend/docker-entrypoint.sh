@@ -26,8 +26,20 @@ if [ -f "/app/prisma/dev.db" ]; then
 fi
 
 # 3. Run Migrations (Drop privileges to nodejs)
-echo "Running database migrations..."
-su-exec nodejs npx prisma migrate deploy
+# If using Turso/LibSQL driver adapter, skip 'migrate deploy' as it's not supported
+# with the 'sqlite' provider for remote databases in the CLI.
+# Also ensure DATABASE_URL is set to a dummy file path if missing to satisfy Prisma validation.
+if [ -z "$DATABASE_URL" ]; then
+    export DATABASE_URL="file:/app/prisma/dev.db"
+fi
+
+if [ -n "$TURSO_DATABASE_URL" ]; then
+    echo "Turso database detected. Skipping 'prisma migrate deploy' (not supported by SQLite provider CLI)."
+    echo "You may need to use 'prisma db push' manually to sync your schema."
+else
+    echo "Running database migrations..."
+    su-exec nodejs npx prisma migrate deploy
+fi
 
 # 4. Start Application (Drop privileges to nodejs)
 echo "Starting application as nodejs..."

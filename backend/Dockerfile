@@ -14,7 +14,7 @@ RUN npm ci
 COPY prisma ./prisma/
 
 # Generate Prisma Client
-RUN npx prisma generate
+RUN DATABASE_URL="file:./dummy.db" npx prisma generate
 
 # Copy source code
 COPY src ./src
@@ -49,7 +49,7 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/src/generated ./dist/generated
 
 # Generate Prisma Client in production (updates node_modules)
-RUN npx prisma generate
+RUN DATABASE_URL="file:./dummy.db" npx prisma generate
 
 # Create necessary directories (ownership will be set in entrypoint)
 RUN mkdir -p /app/uploads /app/prisma

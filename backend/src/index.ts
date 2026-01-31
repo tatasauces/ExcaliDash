@@ -1,6 +1,8 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
 import path from "path";
 import fs from "fs";
 import { promises as fsPromises } from "fs";
@@ -25,8 +27,6 @@ import {
   getCsrfTokenHeader,
   getOriginFromReferer,
 } from "./security";
-
-dotenv.config();
 
 const backendRoot = path.resolve(__dirname, "../");
 const defaultDbPath = path.resolve(backendRoot, "prisma/dev.db");
@@ -156,7 +156,14 @@ const libsql = createClient({
   authToken: process.env.TURSO_AUTH_TOKEN,
 });
 const adapter = new PrismaLibSQL(libsql);
-const prisma = new PrismaClient({ adapter });
+const prisma = new PrismaClient({
+  adapter,
+  datasources: {
+    db: {
+      url: process.env.DATABASE_URL,
+    },
+  },
+});
 
 const parseJsonField = <T>(
   rawValue: string | null | undefined,
