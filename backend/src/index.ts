@@ -12,6 +12,7 @@ import archiver from "archiver";
 import { z } from "zod";
 import { PrismaClient, Prisma } from "./generated/client";
 import { PrismaLibSQL } from '@prisma/adapter-libsql';
+import { createClient } from '@libsql/client';
 import {
   sanitizeDrawingData,
   validateImportedDrawing,
@@ -144,10 +145,11 @@ const io = new Server(httpServer, {
   },
   maxHttpBufferSize: 1e8,
 });
-const adapter = new PrismaLibSQL({
-  url: process.env.TURSO_DATABASE_URL,
+const libsql = createClient({
+  url: process.env.TURSO_DATABASE_URL!,
   authToken: process.env.TURSO_AUTH_TOKEN,
 });
+const adapter = new PrismaLibSQL(libsql);
 const prisma = new PrismaClient({ adapter });
 
 const parseJsonField = <T>(
