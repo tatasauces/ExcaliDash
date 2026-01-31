@@ -36,6 +36,12 @@ const resolveDatabaseUrl = (rawUrl?: string) => {
   }
 
   if (!rawUrl.startsWith("file:")) {
+    // Prisma's 'sqlite' provider requires the URL to start with 'file:'.
+    // When using Turso/LibSQL with driver adapters, we still need to satisfy this validation
+    // even if the actual connection is handled by the adapter.
+    if (rawUrl.startsWith("libsql:") || rawUrl.startsWith("https:") || process.env.TURSO_DATABASE_URL) {
+      return `file:${defaultDbPath}`;
+    }
     return rawUrl;
   }
 
