@@ -102,7 +102,10 @@ const normalizeOrigins = (rawOrigins?: string | null): string[] => {
 };
 
 const allowedOrigins = normalizeOrigins(process.env.FRONTEND_URL);
-console.log("Allowed origins:", allowedOrigins);
+if (!process.env.FRONTEND_URL) {
+  console.warn("FRONTEND_URL not set, falling back to localhost for CORS");
+}
+console.log("Allowed origins for CORS:", allowedOrigins);
 
 const uploadDir = path.resolve(__dirname, "../uploads");
 
@@ -715,6 +718,15 @@ io.on("connection", (socket) => {
         io.to(roomId).emit("presence-update", users);
       }
     });
+  });
+});
+
+app.get("/", (req, res) => {
+  res.status(200).json({
+    message: "ExcaliDash API Server is running",
+    status: "healthy",
+    version: "0.3.1",
+    documentation: "https://github.com/your-repo/excalidash"
   });
 });
 
