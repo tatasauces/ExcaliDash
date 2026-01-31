@@ -84,7 +84,8 @@ async function sync() {
       await client.execute(statement);
     }
 
-    console.log('Successfully synced schema to Turso!');
+    console.log('\n[SUCCESS] Successfully synced schema to Turso!');
+    console.log(`Database: ${url}\n`);
   } catch (error) {
     console.error('Failed to sync schema:', error);
     process.exit(1);

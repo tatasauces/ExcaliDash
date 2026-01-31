@@ -155,8 +155,15 @@ const io = new Server(httpServer, {
   },
   maxHttpBufferSize: 1e8,
 });
+const tursoUrl = process.env.TURSO_DATABASE_URL || "";
+const hasTursoToken = !!process.env.TURSO_AUTH_TOKEN;
+
+console.log("Turso Configuration:");
+console.log("- URL:", tursoUrl ? `${tursoUrl.substring(0, 15)}...` : "MISSING");
+console.log("- Auth Token:", hasTursoToken ? "PRESENT" : "MISSING");
+
 const libsql = createClient({
-  url: process.env.TURSO_DATABASE_URL!,
+  url: tursoUrl,
   authToken: process.env.TURSO_AUTH_TOKEN,
 });
 const adapter = new PrismaLibSQL(libsql);
