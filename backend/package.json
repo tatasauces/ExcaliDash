@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "nodemon src/index.ts",
     "test": "vitest run",
+    "db:push:turso": "ts-node src/scripts/sync-turso.ts",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
   },
