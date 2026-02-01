@@ -1,5 +1,5 @@
 # Build stage
-FROM node:20-alpine AS builder
+FROM node:20-slim AS builder
 
 WORKDIR /app
 
@@ -23,12 +23,14 @@ COPY src ./src
 RUN npx tsc
 
 # Production stage
-FROM node:20-alpine
+FROM node:20-slim
 
-# Install OpenSSL for Prisma and su-exec, create non-root user
-RUN apk add --no-cache openssl su-exec && \
-    addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001
+# Install OpenSSL for Prisma and gosu, create non-root user
+RUN apt-get update && \
+    apt-get install -y openssl gosu && \
+    rm -rf /var/lib/apt/lists/* && \
+    groupadd -g 1001 nodejs && \
+    useradd -u 1001 -g nodejs -s /bin/sh nodejs
 
 WORKDIR /app
 

@@ -38,9 +38,9 @@ if [ -n "$TURSO_DATABASE_URL" ]; then
     echo "You may need to use 'prisma db push' manually to sync your schema."
 else
     echo "Running database migrations..."
-    su-exec nodejs npx prisma migrate deploy
+    gosu nodejs npx prisma migrate deploy
 fi
 
 # 4. Start Application (Drop privileges to nodejs)
 echo "Starting application as nodejs..."
-exec su-exec nodejs node dist/index.js
+exec gosu nodejs node dist/index.js
