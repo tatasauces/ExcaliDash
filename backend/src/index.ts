@@ -30,6 +30,14 @@ import {
 
 const backendRoot = path.resolve(__dirname, "../");
 const defaultDbPath = path.resolve(backendRoot, "prisma/dev.db");
+
+/**
+ * Helper to strip single or double quotes from the start and end of a string
+ */
+const cleanEnvVar = (val?: string) => {
+  if (!val) return val;
+  return val.replace(/^['"]|['"]$/g, "").trim();
+};
 const resolveDatabaseUrl = (rawUrl?: string) => {
   if (!rawUrl || rawUrl.trim().length === 0) {
     return `file:${defaultDbPath}`;
@@ -161,16 +169,25 @@ const io = new Server(httpServer, {
   },
   maxHttpBufferSize: 1e8,
 });
-const tursoUrl = process.env.TURSO_DATABASE_URL || "";
-const hasTursoToken = !!process.env.TURSO_AUTH_TOKEN;
+const tursoUrl = cleanEnvVar(process.env.TURSO_DATABASE_URL) || "";
+const tursoAuthToken = cleanEnvVar(process.env.TURSO_AUTH_TOKEN);
 
 console.log("Turso Configuration:");
-console.log("- URL:", tursoUrl ? `${tursoUrl.substring(0, 15)}...` : "MISSING");
-console.log("- Auth Token:", hasTursoToken ? "PRESENT" : "MISSING");
+console.log("- URL Detected:", tursoUrl ? "YES" : "NO");
+if (tursoUrl) {
+  // Reveal just enough to verify the host, but hide the sensitive part
+  try {
+    const parsedUrl = new URL(tursoUrl);
+    console.log("- Host:", parsedUrl.host);
+  } catch (e) {
+    console.log("- URL (truncated):", `${tursoUrl.substring(0, 15)}...`);
+  }
+}
+console.log("- Auth Token Detected:", tursoAuthToken ? "YES" : "NO");
 
 const libsql = createClient({
   url: tursoUrl,
-  authToken: process.env.TURSO_AUTH_TOKEN,
+  authToken: tursoAuthToken,
 });
 const adapter = new PrismaLibSQL(libsql);
 const prisma = new PrismaClient({
