@@ -142,6 +142,12 @@ const initializeUploadDir = async () => {
 
 const app = express();
 
+// Request logger
+app.use((req, res, next) => {
+  console.log(`[REQUEST] ${req.method} ${req.path}`);
+  next();
+});
+
 // Trust proxy headers (X-Forwarded-For, X-Real-IP) from nginx
 // Required for correct client IP detection when running behind a reverse proxy
 // This fixes CSRF token validation failures in Docker/K8s environments
@@ -1313,7 +1319,7 @@ const ensureTrashCollection = async () => {
     if (err.code === "P2021" || (err.message && err.message.includes("no such table"))) {
       console.error("\n[DATABASE ERROR] Tables are missing in your Turso database.");
       console.error("Please run the following command from your LOCAL terminal to initialize the database:");
-      console.error("\n  cd backend && npx prisma db push\n");
+      console.error("\n  cd backend && npm run db:push:turso\n");
       console.error("Make sure your local .env has TURSO_DATABASE_URL and TURSO_AUTH_TOKEN set.\n");
     } else {
       console.error("Failed to ensure Trash collection:", error);
