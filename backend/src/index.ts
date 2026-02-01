@@ -190,14 +190,7 @@ const libsql = createClient({
   authToken: tursoAuthToken,
 });
 const adapter = new PrismaLibSQL(libsql);
-const prisma = new PrismaClient({
-  adapter,
-  datasources: {
-    db: {
-      url: resolvedDatabaseUrl,
-    },
-  },
-});
+const prisma = new PrismaClient({ adapter });
 
 const parseJsonField = <T>(
   rawValue: string | null | undefined,
