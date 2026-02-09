@@ -1,6 +1,8 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
 import path from "path";
 import fs from "fs";
 import { promises as fsPromises } from "fs";
@@ -12,6 +14,7 @@ import archiver from "archiver";
 import { z } from "zod";
 import { PrismaClient, Prisma } from "./generated/client";
 import { PrismaLibSQL } from '@prisma/adapter-libsql';
+import { createClient } from '@libsql/client';
 import {
   sanitizeDrawingData,
   validateImportedDrawing,
@@ -25,16 +28,28 @@ import {
   getOriginFromReferer,
 } from "./security";
 
-dotenv.config();
-
 const backendRoot = path.resolve(__dirname, "../");
 const defaultDbPath = path.resolve(backendRoot, "prisma/dev.db");
+
+/**
+ * Helper to strip single or double quotes from the start and end of a string
+ */
+const cleanEnvVar = (val?: string) => {
+  if (!val) return val;
+  return val.replace(/^['"]|['"]$/g, "").trim();
+};
 const resolveDatabaseUrl = (rawUrl?: string) => {
   if (!rawUrl || rawUrl.trim().length === 0) {
     return `file:${defaultDbPath}`;
   }
 
   if (!rawUrl.startsWith("file:")) {
+    // Prisma's 'sqlite' provider requires the URL to start with 'file:'.
+    // When using Turso/LibSQL with driver adapters, we still need to satisfy this validation
+    // even if the actual connection is handled by the adapter.
+    if (rawUrl.startsWith("libsql:") || rawUrl.startsWith("https:") || process.env.TURSO_DATABASE_URL) {
+      return `file:${defaultDbPath}`;
+    }
     return rawUrl;
   }
 
@@ -59,8 +74,9 @@ const resolveDatabaseUrl = (rawUrl?: string) => {
   return `file:${absolutePath}`;
 };
 
-process.env.DATABASE_URL = resolveDatabaseUrl(process.env.DATABASE_URL);
-console.log("Resolved DATABASE_URL:", process.env.DATABASE_URL);
+const resolvedDatabaseUrl = resolveDatabaseUrl(process.env.DATABASE_URL);
+process.env.DATABASE_URL = resolvedDatabaseUrl;
+console.log("Resolved DATABASE_URL for Prisma validation:", resolvedDatabaseUrl);
 
 // Helper to get the resolved database file path
 const getResolvedDbPath = (): string => {
@@ -95,7 +111,10 @@ const normalizeOrigins = (rawOrigins?: string | null): string[] => {
 };
 
 const allowedOrigins = normalizeOrigins(process.env.FRONTEND_URL);
-console.log("Allowed origins:", allowedOrigins);
+if (!process.env.FRONTEND_URL) {
+  console.warn("FRONTEND_URL not set, falling back to localhost for CORS");
+}
+console.log("Allowed origins for CORS:", allowedOrigins);
 
 const uploadDir = path.resolve(__dirname, "../uploads");
 
@@ -131,6 +150,12 @@ const initializeUploadDir = async () => {
 
 const app = express();
 
+// Request logger
+app.use((req, res, next) => {
+  console.log(`[REQUEST] ${req.method} ${req.path}`);
+  next();
+});
+
 // Trust proxy headers (X-Forwarded-For, X-Real-IP) from nginx
 // Required for correct client IP detection when running behind a reverse proxy
 // This fixes CSRF token validation failures in Docker/K8s environments
@@ -144,10 +169,27 @@ const io = new Server(httpServer, {
   },
   maxHttpBufferSize: 1e8,
 });
-const adapter = new PrismaLibSQL({
-  url: process.env.TURSO_DATABASE_URL,
-  authToken: process.env.TURSO_AUTH_TOKEN,
+const tursoUrl = cleanEnvVar(process.env.TURSO_DATABASE_URL) || "";
+const tursoAuthToken = cleanEnvVar(process.env.TURSO_AUTH_TOKEN);
+
+console.log("Turso Configuration:");
+console.log("- URL Detected:", tursoUrl ? "YES" : "NO");
+if (tursoUrl) {
+  // Reveal just enough to verify the host, but hide the sensitive part
+  try {
+    const parsedUrl = new URL(tursoUrl);
+    console.log("- Host:", parsedUrl.host);
+  } catch (e) {
+    console.log("- URL (truncated):", `${tursoUrl.substring(0, 15)}...`);
+  }
+}
+console.log("- Auth Token Detected:", tursoAuthToken ? "YES" : "NO");
+
+const libsql = createClient({
+  url: tursoUrl,
+  authToken: tursoAuthToken,
 });
+const adapter = new PrismaLibSQL(libsql);
 const prisma = new PrismaClient({ adapter });
 
 const parseJsonField = <T>(
@@ -700,6 +742,15 @@ io.on("connection", (socket) => {
         io.to(roomId).emit("presence-update", users);
       }
     });
+  });
+});
+
+app.get("/", (req, res) => {
+  res.status(200).json({
+    message: "ExcaliDash API Server is running",
+    status: "healthy",
+    version: "0.3.1",
+    documentation: "https://github.com/your-repo/excalidash"
   });
 });
 
@@ -1274,12 +1325,31 @@ const ensureTrashCollection = async () => {
       console.log("Created Trash collection");
     }
   } catch (error) {
-    console.error("Failed to ensure Trash collection:", error);
+    const err = error as any;
+    if (err.code === "P2021" || (err.message && err.message.includes("no such table"))) {
+      console.error("\n[DATABASE ERROR] Tables are missing in your Turso database.");
+      console.error("Please run the following command from your LOCAL terminal to initialize the database:");
+      console.error("\n  cd backend && npm run db:push:turso\n");
+      console.error("Make sure your local .env has TURSO_DATABASE_URL and TURSO_AUTH_TOKEN set.\n");
+    } else {
+      console.error("Failed to ensure Trash collection:", error);
+    }
+  }
+};
+
+const checkDatabaseConnection = async () => {
+  try {
+    // Simple query to verify connection
+    await prisma.$queryRaw`SELECT 1`;
+    console.log("Database connection successful.");
+  } catch (error) {
+    console.error("[DATABASE ERROR] Could not connect to Turso:", error);
   }
 };
 
 httpServer.listen(PORT, async () => {
   await initializeUploadDir();
+  await checkDatabaseConnection();
   await ensureTrashCollection();
   console.log(`Server running on port ${PORT}`);
 });

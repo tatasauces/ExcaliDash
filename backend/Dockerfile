@@ -1,5 +1,5 @@
 # Build stage
-FROM node:20-alpine AS builder
+FROM node:20-slim AS builder
 
 WORKDIR /app
 
@@ -14,7 +14,7 @@ RUN npm ci
 COPY prisma ./prisma/
 
 # Generate Prisma Client
-RUN npx prisma generate
+RUN DATABASE_URL="file:./dummy.db" npx prisma generate
 
 # Copy source code
 COPY src ./src
@@ -23,12 +23,14 @@ COPY src ./src
 RUN npx tsc
 
 # Production stage
-FROM node:20-alpine
+FROM node:20-slim
 
-# Install OpenSSL for Prisma and su-exec, create non-root user
-RUN apk add --no-cache openssl su-exec && \
-    addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001
+# Install OpenSSL for Prisma and gosu, create non-root user
+RUN apt-get update && \
+    apt-get install -y openssl gosu && \
+    rm -rf /var/lib/apt/lists/* && \
+    groupadd -g 1001 nodejs && \
+    useradd -u 1001 -g nodejs -s /bin/sh nodejs
 
 WORKDIR /app
 
@@ -49,7 +51,7 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/src/generated ./dist/generated
 
 # Generate Prisma Client in production (updates node_modules)
-RUN npx prisma generate
+RUN DATABASE_URL="file:./dummy.db" npx prisma generate
 
 # Create necessary directories (ownership will be set in entrypoint)
 RUN mkdir -p /app/uploads /app/prisma
